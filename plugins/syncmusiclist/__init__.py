@@ -16,7 +16,7 @@ from app.plugins.syncmusiclist.cloudmusic import CloudMusic
 from app.plugins.syncmusiclist.plex_music import PlexMusic
 
 
-class SyncMusic(_PluginBase):
+class SyncMusicList(_PluginBase):
     # 插件名称
     plugin_name = "同步QQ/网易云歌单"
     # 插件描述
