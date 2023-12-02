@@ -22,7 +22,7 @@ class SyncMusic(_PluginBase):
     # 插件描述
     plugin_desc = "同步qq/网易云歌单到plex和emby。"
     # 插件图标
-    plugin_icon = "music.png"
+    plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png"
     # 插件版本
     plugin_version = "0.7"
     # 插件作者
