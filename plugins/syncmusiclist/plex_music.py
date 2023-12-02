@@ -60,7 +60,7 @@ class PlexMusic(Plex):
     def get_tracks_by_playlist(self, playlist_title):
         """获取播放列表的详细歌单"""
         if playlist_title not in self.music_playlists:
-            logger.warn(f"Plex媒体库中播放列表为:{self.music_playlists}\n 不存在: {playlist_title}, 请手动创建")
+            logger.warn(f"Plex媒体库中播放列表为:{self.music_playlists}\n 不存在: {playlist_title}, 稍后会自动创建，如果失败请手动创建")
             return []
         playlist = self._plex.playlist(playlist_title)
         # 获取歌单中的歌曲
