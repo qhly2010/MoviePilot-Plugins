@@ -18,7 +18,7 @@ from app.plugins.syncmusiclist.plex_music import PlexMusic
 
 class SyncMusic(_PluginBase):
     # 插件名称
-    plugin_name = "歌单同步功"
+    plugin_name = "歌单同步功能"
     # 插件描述
     plugin_desc = "同步qq/网易云歌单到plex和emby。"
     # 插件图标
