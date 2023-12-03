@@ -390,6 +390,7 @@ class SyncMusicList(_PluginBase):
         return
 
     def __t_emby(self, em, t_tracks, media_playlist):
+        logger.info("Emby开始同步歌单,涉及搜索时间较长请耐心等待.......")
         tracks = em.mul_search_music(t_tracks)
         playlist_id, music_ids = em.get_tracks_by_playlist(media_playlist)
         if playlist_id:
@@ -397,9 +398,11 @@ class SyncMusicList(_PluginBase):
             em.set_tracks_to_playlist(playlist_id, ','.join(ids))
         else:
             em.create_playlist(media_playlist, ','.join(tracks))
+        logger.info("Emby同步歌单完成,感谢耐心等待.......")
         return
 
     def __t_plex(self, pm, t_tracks, media_playlist):
+        logger.info("Plex开始同步歌单,涉及搜索时间较长请耐心等待.......")
         add_tracks = []
         plex_tracks = pm.get_tracks_by_playlist(media_playlist)
         logger.debug(f"plex播放列表 {media_playlist} 已存在歌曲: {plex_tracks}")
@@ -417,17 +420,18 @@ class SyncMusicList(_PluginBase):
                 try:
                     # 创建如果存在创建失败就进行添加
                     pm.create_playlist(media_playlist, add_tracks)
-                    logger.info(f"创建播放列表{media_playlist}成功，并添加曲目: {[i.title for i in add_tracks]}")
+                    logger.info(f"Plex创建播放列表[{media_playlist}]成功，并添加曲目: {[i.title for i in add_tracks]}")
                 except Exception as err:
                     logger.error(f"{err}")
             else:
                 try:
                     pm.set_tracks_to_playlist(media_playlist, add_tracks)
-                    logger.info(f"向播放列表{media_playlist}添加曲目 {[i.title for i in add_tracks]} 成功")
+                    logger.info(f"Plex向播放列表[{media_playlist}]添加曲目 {[i.title for i in add_tracks]} 成功")
                 except Exception as e:
                     logger.error(f"{e}")
         else:
-            logger.info(f"该歌单在媒体库搜索获取为空，创建/添加播放列表失败")
+            logger.info(f"Plex该歌单在媒体库搜索获取为空，创建/添加播放列表失败")
+        logger.info("Plex同步歌单完成,感谢耐心等待.......")
         return
 
     def stop_service(self):

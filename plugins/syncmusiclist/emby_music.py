@@ -30,10 +30,10 @@ class EmbyMusic(Emby):
             if res:
                 return res.json().get("Items")
             else:
-                logger.error(f"User/Views 未获取到返回数据")
+                logger.error(f"EmbyUser/Views 未获取到返回数据")
                 return []
         except Exception as e:
-            logger.error(f"连接User/Views 出错：" + str(e))
+            logger.error(f"Emby连接User/Views 出错：" + str(e))
             return []
 
     def get_music_library(self):
@@ -76,7 +76,7 @@ class EmbyMusic(Emby):
                 playlist_id = i.get('Id')
                 break
         if not playlist_id:
-            logger.warn(f"Emby媒体库中播放列表为:{self.music_playlists}\n 不存在: {playlist_title}, 稍后会自动创建，如果失败请手动创建")
+            logger.warn(f"Emby媒体库中播放列表为:[{self.music_playlists}]\n 不存在: [{playlist_title}], 稍后会自动创建，如果失败请手动创建")
             return '', []
         url = f'{self._host}emby/Users/{self.user}/Items?ParentId={playlist_id}&api_key={self._apikey}'
         try:
@@ -91,7 +91,7 @@ class EmbyMusic(Emby):
     def create_playlist(self, name, ids):
         """创建播放列表"""
         if name in [i.get('Name') for i in self.music_playlists]:
-            logger.info(f"歌单: {name} 已经存在，跳过创建")
+            logger.info(f"Emby歌单: [{name}] 已经存在，跳过创建")
         # Playlists
         url = f'{self._host}emby/Playlists?api_key={self._apikey}&userId={self.user}&Name={name}&Ids={ids}'
         try:
@@ -104,10 +104,10 @@ class EmbyMusic(Emby):
                 logger.info(f"Emby创建歌单成功:{info}")
                 return True
             else:
-                logger.error(f"Emby创建歌单失败:{name}")
+                logger.error(f"Emby创建歌单失败:[{name}]")
                 return False
         except Exception as e:
-            logger.error(f"Emby创建歌单失败:{name}: {e}")
+            logger.error(f"Emby创建歌单失败:[{name}]: {e}")
             return False
 
     def set_tracks_to_playlist(self, playlist_id, ids):
@@ -120,7 +120,7 @@ class EmbyMusic(Emby):
             )
             if res.status_code == 200:
                 info = res.json()
-                logger.info(f"Emby歌单添加歌曲成功:{info}")
+                logger.info(f"Emby歌单添加歌曲成功:[{info}]")
                 return True
             else:
                 logger.error(f"Emby歌单添加歌曲失败")

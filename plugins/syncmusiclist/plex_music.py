@@ -23,7 +23,7 @@ class PlexMusic(Plex):
         try:
             _libraries = self._plex.library.sections()
         except Exception as err:
-            logger.error(f"获取媒体服务器所有媒体库列表出错：{str(err)}")
+            logger.error(f"Plex获取媒体服务器所有媒体库列表出错：{str(err)}")
             return []
         for library in _libraries:
             match library.type:
