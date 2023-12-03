@@ -13,6 +13,7 @@ from typing import Any, List, Dict, Tuple
 from app.log import logger
 from app.plugins.syncmusiclist.QQmusic import QQMusicApi
 from app.plugins.syncmusiclist.cloudmusic import CloudMusic
+from app.plugins.syncmusiclist.emby_music import EmbyMusic
 from app.plugins.syncmusiclist.plex_music import PlexMusic
 
 
@@ -24,7 +25,7 @@ class SyncMusicList(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png"
     # 插件版本
-    plugin_version = "0.7"
+    plugin_version = "1.7"
     # 插件作者
     plugin_author = "逗猫"
     # 作者主页
@@ -182,7 +183,7 @@ class SyncMusicList(_PluginBase):
                                             'label': '媒体服务器',
                                             'items': [
                                                 {'title': 'Plex', 'value': 'plex'},
-                                                # {'title': 'Emby', 'value': 'emby'},
+                                                {'title': 'Emby', 'value': 'emby'},
                                             ]
                                         }
                                     }
@@ -337,16 +338,22 @@ class SyncMusicList(_PluginBase):
         """
         开始同步歌单
         """
+        global pm, em
         if not self._wymusic_paths and not self._qqmusic_paths:
             logger.info("同步配置为空,不进行处理。告退......")
             return
         if not self._media_server:
             logger.info("没有可用的媒体服务器,不进行处理。告退......")
             return
-        # plex 初始化
-        pm = PlexMusic()
-        pm.get_music_library()
-        pm.get_playlists()
+        if 'plex' in self._media_server:
+            # plex 初始化
+            pm = PlexMusic()
+            pm.get_music_library()
+            pm.get_playlists()
+        if 'emby' in self._media_server:
+            # emby 初始化
+            em = EmbyMusic()
+            em.get_music_library()
         # 获取同步列表信息
         if self._qqmusic_paths:
             qq = QQMusicApi()
@@ -357,7 +364,10 @@ class SyncMusicList(_PluginBase):
                 if qq_play_id and media_playlist:
                     qq_tracks = qq.get_playlist_by_id(qq_play_id)
                     logger.debug(f"QQ歌单 {qq_play_id} 获取歌曲: {qq_tracks}")
-                    self.__t_plex(pm, qq_tracks, media_playlist)
+                    if 'plex' in self._media_server:
+                        self.__t_plex(pm, qq_tracks, media_playlist)
+                    if 'emby' in self._media_server:
+                        self.__t_emby(em, qq_tracks, media_playlist)
                 else:
                     logger.warn(f"QQ音乐歌单同步设置配置不规范,请认真检查修改")
         if self._wymusic_paths:
@@ -371,9 +381,22 @@ class SyncMusicList(_PluginBase):
                 if wy_play_id and media_playlist:
                     wy_tracks = cm.songofplaylist(wy_play_id)
                     logger.debug(f"网易云歌单 {wy_play_id} 获取歌曲: {wy_tracks}")
-                    self.__t_plex(pm, wy_tracks, media_playlist)
+                    if 'plex' in self._media_server:
+                        self.__t_plex(pm, wy_tracks, media_playlist)
+                    if 'emby' in self._media_server:
+                        self.__t_emby(em, wy_tracks, media_playlist)
                 else:
                     logger.warn(f"网易云音乐歌单同步设置配置不规范,请认真检查修改")
+        return
+
+    def __t_emby(self, em, t_tracks, media_playlist):
+        tracks = em.mul_search_music(t_tracks)
+        playlist_id, music_ids = em.get_tracks_by_playlist(media_playlist)
+        if playlist_id:
+            ids = [i for i in tracks if i not in music_ids]
+            em.set_tracks_to_playlist(playlist_id, ','.join(ids))
+        else:
+            em.create_playlist(media_playlist, ','.join(tracks))
         return
 
     def __t_plex(self, pm, t_tracks, media_playlist):
