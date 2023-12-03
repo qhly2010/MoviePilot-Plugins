@@ -89,6 +89,6 @@ class PlexMusic(Plex):
 if __name__ == '__main__':
     pm = PlexMusic()
     ml = pm.get_music_library()
-    ml = pm.get_playlists()
+    pm.get_playlists()
     pm.get_tracks_by_playlist('经典华语')
-    pm.search_music('稻香')
+    res = pm.search_music('七里香')

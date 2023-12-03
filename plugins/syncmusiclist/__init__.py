@@ -25,7 +25,7 @@ class SyncMusicList(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png"
     # 插件版本
-    plugin_version = "1.7"
+    plugin_version = "2.7"
     # 插件作者
     plugin_author = "逗猫"
     # 作者主页
@@ -65,7 +65,7 @@ class SyncMusicList(_PluginBase):
             self._onlyonce = config.get("onlyonce")
             self._cron = config.get("cron")
             self._media_server = config.get("media_server") or []
-            self._wylogin_user = config.get("wylogin_password") or ""
+            self._wylogin_user = config.get("wylogin_user") or ""
             self._wylogin_password = config.get("wylogin_password") or ""
             self._wymusic_paths = config.get("wymusic_paths") or ""
             self._qqmusic_paths = config.get("qqmusic_paths") or ""
@@ -314,7 +314,7 @@ class SyncMusicList(_PluginBase):
                                                 '3. 如不存在会自动创建歌单, 如库中没符合的歌曲会创建失败; \n'
                                                 '4. 歌单同步只会搜索已存在歌曲进行添加,不会自动下载; \n'
                                                 '5. 歌曲匹配是模糊匹配只匹配曲名不匹配歌手; \n'
-                                                '6. 网易云同步自己的歌单需要登录其他情况非强制登录; \n'
+                                                '6. 网易云歌单同步最好登录自己的账号，失败率会小很多; \n'
                                         }
                                     }
                                 ]
@@ -363,7 +363,7 @@ class SyncMusicList(_PluginBase):
                 logger.debug(f"QQ歌单id: {qq_play_id}, 媒体库播放列表名称: {media_playlist}")
                 if qq_play_id and media_playlist:
                     qq_tracks = qq.get_playlist_by_id(qq_play_id)
-                    logger.debug(f"QQ歌单 {qq_play_id} 获取歌曲: {qq_tracks}")
+                    logger.info(f"QQ歌单 {qq_play_id} 获取歌曲[{len(qq_tracks)}]首,列表为: {qq_tracks}")
                     if 'plex' in self._media_server:
                         self.__t_plex(pm, qq_tracks, media_playlist)
                     if 'emby' in self._media_server:
@@ -380,19 +380,24 @@ class SyncMusicList(_PluginBase):
                 logger.debug(f"网易云歌单id: {wy_play_id}, 媒体库播放列表名称: {media_playlist}")
                 if wy_play_id and media_playlist:
                     wy_tracks = cm.songofplaylist(wy_play_id)
-                    logger.debug(f"网易云歌单 {wy_play_id} 获取歌曲: {wy_tracks}")
-                    if 'plex' in self._media_server:
-                        self.__t_plex(pm, wy_tracks, media_playlist)
-                    if 'emby' in self._media_server:
-                        self.__t_emby(em, wy_tracks, media_playlist)
+                    if not wy_tracks:
+                        logger.error("网易云歌单获取失败，请登录账号重试")
+                    else:
+                        logger.info(f"网易云歌单 {wy_play_id} 获取歌曲[{len(wy_tracks)}]首,列表为: {wy_tracks}")
+                        if 'plex' in self._media_server:
+                            self.__t_plex(pm, wy_tracks, media_playlist)
+                        if 'emby' in self._media_server:
+                            self.__t_emby(em, wy_tracks, media_playlist)
                 else:
                     logger.warn(f"网易云音乐歌单同步设置配置不规范,请认真检查修改")
         return
 
     def __t_emby(self, em, t_tracks, media_playlist):
         logger.info("Emby开始同步歌单,涉及搜索时间较长请耐心等待.......")
-        tracks = em.mul_search_music(t_tracks)
-        playlist_id, music_ids = em.get_tracks_by_playlist(media_playlist)
+        playlist_id, music_ids, music_names = em.get_tracks_by_playlist(media_playlist)
+        logger.info(f"Emby歌单[{media_playlist}]现有歌曲[{len(music_names)}]首,列表为: {music_names}")
+        new_tracks = list(set(t_tracks) - set(music_names))
+        tracks = em.mul_search_music(new_tracks)
         if playlist_id:
             ids = [i for i in tracks if i not in music_ids]
             em.set_tracks_to_playlist(playlist_id, ','.join(ids))
@@ -405,7 +410,7 @@ class SyncMusicList(_PluginBase):
         logger.info("Plex开始同步歌单,涉及搜索时间较长请耐心等待.......")
         add_tracks = []
         plex_tracks = pm.get_tracks_by_playlist(media_playlist)
-        logger.debug(f"plex播放列表 {media_playlist} 已存在歌曲: {plex_tracks}")
+        logger.debug(f"plex播放列表 [{media_playlist}] 已存在歌曲[{len(plex_tracks)}]首,列表为: {plex_tracks}")
         # 查找获取tracks
         for t_track in t_tracks:
             if t_track in plex_tracks:
@@ -414,25 +419,28 @@ class SyncMusicList(_PluginBase):
             add_tracks += tracks
         # 去重
         add_tracks = list(set(add_tracks))
+        no_list = list(set(t_tracks) - set([i.title for i in add_tracks]))
+        logger.info(f"Plex库中未搜到歌曲[{len(no_list)}]首,列表为: {no_list}")
         # 有歌曲写入没有就跳过
         if len(add_tracks) > 0:
             if len(plex_tracks) < 1:
                 try:
                     # 创建如果存在创建失败就进行添加
                     pm.create_playlist(media_playlist, add_tracks)
-                    logger.info(f"Plex创建播放列表[{media_playlist}]成功，并添加曲目: {[i.title for i in add_tracks]}")
+                    logger.info(f"Plex创建播放列表[{media_playlist}]成功，并添加歌曲[{len(add_tracks)}]首,列表为: {[i.title for i in add_tracks]}")
                 except Exception as err:
                     logger.error(f"{err}")
             else:
                 try:
                     pm.set_tracks_to_playlist(media_playlist, add_tracks)
-                    logger.info(f"Plex向播放列表[{media_playlist}]添加曲目 {[i.title for i in add_tracks]} 成功")
+                    logger.info(f"Plex向播放列表[{media_playlist}]添加歌曲[{len(add_tracks)}]首,列表为: {[i.title for i in add_tracks]}成功")
                 except Exception as e:
                     logger.error(f"{e}")
         else:
             logger.info(f"Plex该歌单在媒体库搜索获取为空，创建/添加播放列表失败")
         logger.info("Plex同步歌单完成,感谢耐心等待.......")
         return
+
 
     def stop_service(self):
         """

@@ -65,7 +65,6 @@ class EmbyMusic(Emby):
                 self.music_playlists += playlist
             else:
                 continue
-        logger.info(f"Emby中的播放列表为: {[i.get('Name') for i in self.music_playlists]}")
         return self.music_libraries
 
     def get_tracks_by_playlist(self, playlist_title):
@@ -76,8 +75,8 @@ class EmbyMusic(Emby):
                 playlist_id = i.get('Id')
                 break
         if not playlist_id:
-            logger.warn(f"Emby媒体库中播放列表为:[{self.music_playlists}]\n 不存在: [{playlist_title}], 稍后会自动创建，如果失败请手动创建")
-            return '', []
+            logger.warn(f"Emby媒体库中播放列表为:[{[i.get('Name') for i in self.music_playlists]}]\n 不存在: [{playlist_title}], 稍后会自动创建，如果失败请手动创建")
+            return '', [], []
         url = f'{self._host}emby/Users/{self.user}/Items?ParentId={playlist_id}&api_key={self._apikey}'
         try:
             res = self.get_data(url)
@@ -86,7 +85,8 @@ class EmbyMusic(Emby):
             logger.error(f"Emby获取播放列表失败: {err}")
             tracks = []
         music_ids = [i.get('Id') for i in tracks if i.get('Type') == 'Audio']
-        return playlist_id, music_ids
+        music_names = [i.get('Name') for i in tracks if i.get('Type') == 'Audio']
+        return playlist_id, music_ids, music_names
 
     def create_playlist(self, name, ids):
         """创建播放列表"""
@@ -139,18 +139,29 @@ class EmbyMusic(Emby):
             if count > 0:
                 items = res.json().get("Items")
                 ids_list = [i.get('Id') for i in items if i.get('Type') == 'Audio'][:1]
+                name_list = [i.get('Name') for i in items if i.get('Type') == 'Audio'][:1]
             else:
                 ids_list = []
+                name_list = []
         except Exception as err:
             logger.error(err)
-            return []
-        return ids_list
+            return [], []
+        return ids_list, name_list
 
     def mul_search_music(self, name_list):
+        logger.info(f"Emby中的播放列表为: {[i.get('Name') for i in self.music_playlists]}")
         all_list = []
-        for name in name_list:
-            ids_list = self.search_music(name)
-            all_list += ids_list
+        lack_list = []
+        add_list = []
+        for names in name_list:
+            ids_list, name_list = self.search_music(names)
+            if len(ids_list) == 0:
+                lack_list.append(names)
+            else:
+                add_list += name_list
+                all_list += ids_list
+        logger.info(f"Emby搜索库中获取歌曲[{len(add_list)}]首,列表为: {add_list}")
+        logger.info(f"Emby库中未搜到歌曲[{len(lack_list)}]首,列表为: {lack_list}")
         return all_list
 
 
@@ -161,7 +172,7 @@ if __name__ == '__main__':
     t_tracks = ['断桥残雪', '有何不可']
 
     tracks = em.mul_search_music(t_tracks)
-    playlist_id, music_ids = em.get_tracks_by_playlist(media_playlist)
+    playlist_id, music_ids, music_names = em.get_tracks_by_playlist(media_playlist)
     if playlist_id:
         ids = [i for i in tracks if i not in music_ids]
         em.set_tracks_to_playlist(playlist_id, ','.join(ids))
