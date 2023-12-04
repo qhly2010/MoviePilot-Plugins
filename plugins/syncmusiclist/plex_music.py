@@ -1,6 +1,7 @@
 from app.log import logger
-from app.schemas import MediaType, MediaServerLibrary
+from app.schemas import MediaServerLibrary
 from app.modules.plex import Plex
+from plexapi.myplex import MyPlexAccount
 
 
 class PlexMusic(Plex):
@@ -13,6 +14,10 @@ class PlexMusic(Plex):
         self.music_libraries = []
         self.music_playlists = []
         self.music_names = []
+
+    def get_user_name(self):
+        account = MyPlexAccount(self._token)
+        return account.username
 
     def get_music_library(self):
         """
@@ -88,7 +93,7 @@ class PlexMusic(Plex):
 
 if __name__ == '__main__':
     pm = PlexMusic()
-    ml = pm.get_music_library()
+    ml = pm.get_user_name()
     pm.get_playlists()
     pm.get_tracks_by_playlist('经典华语')
     res = pm.search_music('七里香')

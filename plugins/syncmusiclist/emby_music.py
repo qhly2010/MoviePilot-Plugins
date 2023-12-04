@@ -4,6 +4,7 @@ from app.log import logger
 from app.schemas import MediaType, MediaServerLibrary
 from app.modules.emby import Emby
 from app.utils.http import RequestUtils
+from app.core.config import settings
 
 
 
@@ -14,9 +15,9 @@ class EmbyMusic(Emby):
 
     def __init__(self):
         Emby.__init__(self)
+        self.default_user = settings.SUPERUSER
         self.music_libraries = []
         self.music_playlists = []
-        self.music_names = []
 
     def __get_emby_librarys(self) -> List[dict]:
         """
@@ -43,6 +44,8 @@ class EmbyMusic(Emby):
         if not self._host or not self._apikey:
             return []
         emby_librarys = self.__get_emby_librarys() or []
+        self.music_playlists = []
+        self.music_libraries = []
         for library in emby_librarys:
             if library.get("CollectionType") == 'music':
                 self.music_libraries.append(
@@ -88,7 +91,7 @@ class EmbyMusic(Emby):
         music_names = [i.get('Name') for i in tracks if i.get('Type') == 'Audio']
         return playlist_id, music_ids, music_names
 
-    def create_playlist(self, name, ids):
+    def create_playlist(self, name, ids, user=settings.SUPERUSER):
         """创建播放列表"""
         if name in [i.get('Name') for i in self.music_playlists]:
             logger.info(f"Emby歌单: [{name}] 已经存在，跳过创建")
@@ -101,16 +104,16 @@ class EmbyMusic(Emby):
             )
             if res.status_code == 200:
                 info = res.json()
-                logger.info(f"Emby创建歌单成功:{info}")
+                logger.info(f"Emby为用户{user}创建歌单成功:{info}")
                 return True
             else:
-                logger.error(f"Emby创建歌单失败:[{name}]")
+                logger.error(f"Emby为用户{user}创建歌单失败:[{name}]")
                 return False
         except Exception as e:
-            logger.error(f"Emby创建歌单失败:[{name}]: {e}")
+            logger.error(f"Emby为用户{user}创建歌单失败:[{name}]: {e}")
             return False
 
-    def set_tracks_to_playlist(self, playlist_id, ids):
+    def set_tracks_to_playlist(self, playlist_id, ids, user=settings.SUPERUSER):
         """添加歌曲到歌单中"""
         url = f'{self._host}emby/Playlists/{playlist_id}/Items?api_key={self._apikey}&userId={self.user}&Ids={ids}'
         try:
@@ -120,10 +123,10 @@ class EmbyMusic(Emby):
             )
             if res.status_code == 200:
                 info = res.json()
-                logger.info(f"Emby歌单添加歌曲成功:[{info}]")
+                logger.info(f"Emby为用户{user}的歌单添加歌曲成功:[{info}]")
                 return True
             else:
-                logger.error(f"Emby歌单添加歌曲失败")
+                logger.error(f"Emby为用户{user}的歌单添加歌曲失败")
                 return False
         except Exception as e:
             logger.error(e)
@@ -167,6 +170,8 @@ class EmbyMusic(Emby):
 
 if __name__ == '__main__':
     em = EmbyMusic()
+    emby_user = 'plb'
+    em.user = em.get_user(emby_user)
     em.get_music_library()
     media_playlist = "许嵩专版"
     t_tracks = ['断桥残雪', '有何不可']
