@@ -354,6 +354,7 @@ class SyncMusicList(_PluginBase):
         global pm, em
         plex_on = False
         emby_on = False
+        emby_users = []
         if not self._wymusic_paths and not self._qqmusic_paths:
             logger.info("同步配置为空,不进行处理。告退......")
             return
@@ -371,6 +372,7 @@ class SyncMusicList(_PluginBase):
             # emby 初始化
             em = EmbyMusic()
             emby_on = True
+            emby_users = [em.default_user]
             logger.info('媒体服务器设置包含Emby服务器')
         # 获取同步列表信息
         if self._qqmusic_paths:
@@ -380,7 +382,6 @@ class SyncMusicList(_PluginBase):
                 data_list = path.split(':')
                 if len(data_list) == 2:
                     qq_play_id, media_playlist = data_list[0], data_list[1]
-                    emby_users = [em.default_user]
                 elif len(data_list) == 3:
                     qq_play_id, media_playlist, emby_users = data_list[0], data_list[1], data_list[2]
                     emby_users = emby_users.split(',')
@@ -409,7 +410,6 @@ class SyncMusicList(_PluginBase):
                 data_list = path.split(':')
                 if len(data_list) == 2:
                     wy_play_id, media_playlist = data_list[0], data_list[1]
-                    emby_users = [em.default_user]
                 elif len(data_list) == 3:
                     wy_play_id, media_playlist, emby_users = data_list[0], data_list[1], data_list[2]
                     emby_users = emby_users.split(',')
