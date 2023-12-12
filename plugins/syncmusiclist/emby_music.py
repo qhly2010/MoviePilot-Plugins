@@ -7,7 +7,6 @@ from app.utils.http import RequestUtils
 from app.core.config import settings
 
 
-
 class EmbyMusic(Emby):
     """API for Plex
         继承根项目, 实现音乐库相关的api
@@ -15,9 +14,35 @@ class EmbyMusic(Emby):
 
     def __init__(self):
         Emby.__init__(self)
-        self.default_user = settings.SUPERUSER
+        self.default_user = self.get_default_user(settings.SUPERUSER)
         self.music_libraries = []
         self.music_playlists = []
+
+    def get_default_user(self, user_name: str = None) -> Optional[Union[str, int]]:
+        """
+        获得管理员用户
+        """
+        if not self._host or not self._apikey:
+            return None
+        req_url = "%sUsers?api_key=%s" % (self._host, self._apikey)
+        try:
+            res = RequestUtils().get_res(req_url)
+            if res:
+                users = res.json()
+                # 先查询是否有与当前用户名称匹配的
+                if user_name:
+                    for user in users:
+                        if user.get("Name") == user_name:
+                            return user.get("Name")
+                # 查询管理员
+                for user in users:
+                    if user.get("Policy", {}).get("IsAdministrator"):
+                        return user.get("Name")
+            else:
+                logger.error(f"Users 未获取到返回数据")
+        except Exception as e:
+            logger.error(f"连接Users出错：" + str(e))
+        return None
 
     def __get_emby_librarys(self) -> List[dict]:
         """
