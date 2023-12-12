@@ -25,7 +25,7 @@ class SyncMusicList(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png"
     # 插件版本
-    plugin_version = "3.7"
+    plugin_version = "4.7"
     # 插件作者
     plugin_author = "逗猫"
     # 作者主页
@@ -47,6 +47,8 @@ class SyncMusicList(_PluginBase):
     _cron = None
     # 媒体服务器
     _media_server = []
+    # 精准匹配开关
+    _exact_match = True
     # 网易云登录设置, 同步自己歌单需要登录，不是自己不需要登录
     _wylogin_type = 'phone'
     _wylogin_user = ''
@@ -65,6 +67,7 @@ class SyncMusicList(_PluginBase):
             self._onlyonce = config.get("onlyonce")
             self._cron = config.get("cron")
             self._media_server = config.get("media_server") or []
+            self._exact_match = config.get("exact_match") or True
             self._wylogin_user = config.get("wylogin_user") or ""
             self._wylogin_password = config.get("wylogin_password") or ""
             self._wymusic_paths = config.get("wymusic_paths") or ""
@@ -102,6 +105,7 @@ class SyncMusicList(_PluginBase):
                     "enabled": self._enabled,
                     "cron": self._cron,
                     "media_server": self._media_server,
+                    "exact_match": self._exact_match,
                     "wylogin_user": self._wylogin_user,
                     "wylogin_password": self._wylogin_password,
                     "wymusic_paths": self._wymusic_paths,
@@ -202,6 +206,22 @@ class SyncMusicList(_PluginBase):
                                             'model': 'cron',
                                             'label': '执行周期',
                                             'placeholder': '5位cron表达式，留空自动'
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'exact_match',
+                                            'label': '精准匹配(同时匹配歌曲名称和歌手)',
                                         }
                                     }
                                 ]
@@ -328,6 +348,7 @@ class SyncMusicList(_PluginBase):
                                                 '5. 歌曲匹配是模糊匹配只匹配曲名不匹配歌手; \n'
                                                 '6. 网易云歌单同步最好登录自己的账号，失败率会小很多; \n'
                                                 '7. emby支持多用户设置，plex自带分享无需创建; \n'
+                                                '8. 精准匹配打开后先进行歌曲搜索然后通过歌手来进行过滤 \n'
                                         }
                                     }
                                 ]
@@ -443,8 +464,12 @@ class SyncMusicList(_PluginBase):
         logger.info("Emby开始同步歌单,涉及搜索时间较长请耐心等待.......")
         playlist_id, music_ids, music_names = em.get_tracks_by_playlist(media_playlist)
         logger.info(f"Emby歌单[{media_playlist}]现有歌曲[{len(music_names)}]首,列表为: {music_names}")
-        new_tracks = list(set(t_tracks) - set(music_names))
-        tracks = em.mul_search_music(new_tracks)
+        if music_names:
+            new_tracks = [i for i in t_tracks if i[0] not in music_names]
+        else:
+            new_tracks = t_tracks
+        # new_tracks = list(set(i[0] for i in t_tracks) - set(music_names))
+        tracks = em.mul_search_music(new_tracks, self._exact_match)
         if playlist_id:
             ids = [i for i in tracks if i not in music_ids]
             em.set_tracks_to_playlist(playlist_id, ','.join(ids))
@@ -468,21 +493,23 @@ class SyncMusicList(_PluginBase):
     def __t_plex(self, pm, t_tracks, media_playlist):
         logger.info("Plex开始同步歌单,涉及搜索时间较长请耐心等待.......")
         add_tracks = []
+        old_tracks = []
         plex_tracks = pm.get_tracks_by_playlist(media_playlist)
         logger.debug(f"plex播放列表 [{media_playlist}] 已存在歌曲[{len(plex_tracks)}]首,列表为: {plex_tracks}")
         # 查找获取tracks
         for t_track in t_tracks:
-            if t_track in plex_tracks:
+            if t_track[0] in plex_tracks:
+                old_tracks.append(t_track)
                 continue
             try:
-                tracks = pm.search_music(t_track)
+                tracks = pm.search_music(t_track, self._exact_match)
             except Exception as e:
                 logger.error(f"搜索歌曲失败,err:{e}")
                 tracks = []
             add_tracks += tracks
         # 去重
         add_tracks = list(set(add_tracks))
-        no_list = list(set(t_tracks) - set([i.title for i in add_tracks]))
+        no_list = list(set(i[0] for i in t_tracks) - set([i.title for i in add_tracks]) - set(i[0] for i in old_tracks))
         logger.info(f"Plex库中未搜到歌曲[{len(no_list)}]首,列表为: {no_list}")
         # 有歌曲写入没有就跳过
         if len(add_tracks) > 0:
@@ -500,7 +527,10 @@ class SyncMusicList(_PluginBase):
                 except Exception as e:
                     logger.error(f"{e}")
         else:
-            logger.info(f"Plex该歌单在媒体库搜索获取为空，创建/添加播放列表失败")
+            if len(old_tracks) == len(t_tracks):
+                logger.info(f"Plex歌单全部同步，无需再次同步")
+            else:
+                logger.info(f"Plex歌单同步完成，有部分歌曲没有查询到，请查看日志")
         logger.info("Plex同步歌单完成,感谢耐心等待.......")
         return
 

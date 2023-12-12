@@ -132,15 +132,20 @@ class EmbyMusic(Emby):
             logger.error(e)
             return False
 
-    def search_music(self, name):
+    def search_music(self, name_singer, exact_match=True):
         """通过歌曲名在库中进行搜索"""
         # /emby/Users/{}/Items?Recursive=true&SearchTerm={}&api_key={}
+        name = name_singer[0]
+        singer = name_singer[1]
         url = f'{self._host}emby/Users/{self.user}/Items?Recursive=true&SearchTerm={name}&api_key={self._apikey}'
         try:
             res = self.get_data(url)
             count = res.json().get("TotalRecordCount")
             if count > 0:
                 items = res.json().get("Items")
+                if exact_match:
+                    # 通过歌手过滤
+                    items = [i for i in items if singer in i.get("Artists", [])]
                 ids_list = [i.get('Id') for i in items if i.get('Type') == 'Audio'][:1]
                 name_list = [i.get('Name') for i in items if i.get('Type') == 'Audio'][:1]
             else:
@@ -151,13 +156,13 @@ class EmbyMusic(Emby):
             return [], []
         return ids_list, name_list
 
-    def mul_search_music(self, name_list):
+    def mul_search_music(self, name_list, exact_match=True):
         logger.info(f"Emby中的播放列表为: {[i.get('Name') for i in self.music_playlists]}")
         all_list = []
         lack_list = []
         add_list = []
         for names in name_list:
-            ids_list, name_list = self.search_music(names)
+            ids_list, name_list = self.search_music(names, exact_match)
             if len(ids_list) == 0:
                 lack_list.append(names)
             else:

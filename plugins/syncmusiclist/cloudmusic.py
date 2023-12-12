@@ -119,7 +119,8 @@ class CloudMusic(object):
                 logger.warn(f"第 {retry_times + 1} 次重试失败：获取歌单错误")
                 retry_times += 1
                 time.sleep(2)  # 添加延时
-        track_names = [i.get('name').split(' (')[0].split('(')[0].split('（')[0] for i in tracks]
+        track_names = [(i.get('name').split(' (')[0].split('(')[0].split('（')[0], i.get('artists')[0].get('name'))
+                       for i in tracks]
         return track_names
 
     def lyric(self, uid, os="pc", lv=-1, kv=-1):

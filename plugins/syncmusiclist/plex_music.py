@@ -82,13 +82,20 @@ class PlexMusic(Plex):
         playlist = self._plex.playlist(playlist_title)
         playlist.addItems(tracks)
 
-    def search_music(self, name):
+    def search_music(self, name_singer, exact_match=True):
         """通过歌曲名在库中进行搜索"""
+        name = name_singer[0]
+        singer = name_singer[1]
         if len(self.music_libraries) == 1:
-            res = self._plex.search(name, mediatype='track', limit=1, sectionId=int(self.music_libraries[0].id))
+            search_res = self._plex.search(name, mediatype='track', sectionId=int(self.music_libraries[0].id))
         else:
-            res = self._plex.search(name, mediatype='track', limit=1)
-        return res
+            search_res = self._plex.search(name, mediatype='track')
+        if len(search_res) > 1:
+            if exact_match:
+                search_res = [i for i in search_res if singer in i.grandparentTitle][:1]
+            else:
+                search_res = search_res[:1]
+        return search_res
 
 
 if __name__ == '__main__':

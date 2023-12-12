@@ -76,7 +76,8 @@ class QQMusicApi(object):
         #             "singer": i.get('singer'),
         #             "title": i.get('title'),
         #         } for i in lst]
-        list_clear = [i.get('name') for i in lst]
+        list_clear = [(i.get('name').split(' (')[0].split('(')[0].split('（')[0], i.get('singer')[0].get('name'))
+                      for i in lst]
         return list_clear
 
 
