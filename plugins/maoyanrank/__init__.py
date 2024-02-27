@@ -531,6 +531,10 @@ class MaoyanRank(_PluginBase):
             for tv_url in tv_urls:
                 tv_list.extend(self.__get_url_info(tv_url, 'tv', nums))
                 time.sleep(2)
+            # 使用字典推导式和集合保持唯一性
+            unique_dicts = {item['title']: item for item in tv_list}.values()
+            # 转回列表形式
+            tv_list = list(unique_dicts)
             self.set_sub(tv_list, history, MediaType.TV)
         # 保存历史记录
         self.save_data('history', history)
