@@ -7,5 +7,14 @@
         "color": "#7eabf3",
         "author": "逗猫",
         "level": 2
+    },
+    "MaoyanSubscribe": {
+        "name": "猫眼榜单订阅",
+        "description": "监控猫眼数据，自动添加订阅。",
+        "version": "0.7",
+        "icon": "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/maoyan.jpg",
+        "color": "#fefefe",
+        "author": "逗猫",
+        "level": 2
     }
 }
