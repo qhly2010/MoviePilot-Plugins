@@ -531,7 +531,6 @@ class MaoyanRank(_PluginBase):
             for tv_url in tv_urls:
                 tv_list.extend(self.__get_url_info(tv_url, 'tv', nums))
                 time.sleep(2)
-            tv_list = list(set(tv_list))
             self.set_sub(tv_list, history, MediaType.TV)
         # 保存历史记录
         self.save_data('history', history)
