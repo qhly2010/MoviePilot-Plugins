@@ -88,6 +88,13 @@ class MaoyanRank(_PluginBase):
         self.stop_service()
 
         # 启动服务
+        # 清理插件历史
+        if self._clear:
+            self.del_data(key="history")
+            self._clear = False
+            self.__update_config()
+            logger.info("历史清理完成")
+
         if self._enabled or self._onlyonce:
             self._scheduler = BackgroundScheduler(timezone=settings.TZ)
             # 周期执行
