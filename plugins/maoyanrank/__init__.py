@@ -535,7 +535,7 @@ class MaoyanRank(_PluginBase):
         tv_list = []
         movie_list = []
         try:
-            movies_list, tv_list = self.__get_url_info(movie_url, tv_urls, nums)
+            movie_list, tv_list = self.__get_url_info(movie_url, tv_urls, nums)
         except Exception as e:
             logger.warn(e)
         self.set_sub(movie_list, history, MediaType.MOVIE)
@@ -615,14 +615,15 @@ class MaoyanRank(_PluginBase):
             browser = p.chromium.launch(headless=False)
             try:
                 context = browser.new_context(user_agent=self.get_random_user_agent())
-                page = context.new_page()
+                page1 = context.new_page()
+                page2 = context.new_page()
                 if movie_url:
                     try:
                         # 打开网页
-                        page.goto(movie_url)
+                        page1.goto(movie_url)
                         # 获取页面内容
-                        html_text = page.content()
-                        body = etree.HTML(html_text)
+                        html_text1 = page1.content()
+                        body = etree.HTML(html_text1)
                         res = json.loads(str(body.xpath('//body//text()')[0]))
                         data = res.get('movieList', {}).get('list', [])
 
@@ -640,10 +641,10 @@ class MaoyanRank(_PluginBase):
                     for tv_url in tv_urls:
                         try:
                             # 打开网页
-                            page.goto(tv_url)
+                            page2.goto(tv_url)
                             # 获取页面内容
-                            html_text = page.content()
-                            body = etree.HTML(html_text)
+                            html_text2 = page2.content()
+                            body = etree.HTML(html_text2)
                             res = json.loads(str(body.xpath('//body//text()')[0]))
                             data = res.get('dataList', {}).get('list', [])
 
