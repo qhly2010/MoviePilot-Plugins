@@ -40,7 +40,7 @@ class MaoyanRank(_PluginBase):
     # 插件描述
     plugin_desc = "监控猫眼数据，自动添加订阅。"
     # 插件图标
-    plugin_icon = "maoyan.jpg"
+    plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/maoyan.jpg"
     # 插件版本
     plugin_version = "0.7"
     # 插件作者
