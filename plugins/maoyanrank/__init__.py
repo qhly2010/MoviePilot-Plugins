@@ -511,8 +511,12 @@ class MaoyanRank(_PluginBase):
         history: List[dict] = self.get_data('history') or []
         if 'movie' in self._type:
             movie_url = 'https://piaofang.maoyan.com/dashboard-ajax/movie'
-            # ''.join(re.findall(r'\d', input_string))
-            movie_list = self.__get_url_info(movie_url, 'movie', nums)
+            movie_list = []
+            try:
+                movie_list = self.__get_url_info(movie_url, 'movie', nums)
+                time.sleep(3)
+            except Exception as e:
+                logger.warn(e)
             self.set_sub(movie_list, history, MediaType.MOVIE)
 
         if 'web-heat' in self._type:
@@ -536,8 +540,11 @@ class MaoyanRank(_PluginBase):
                     )
             tv_list = []
             for tv_url in tv_urls:
-                tv_list.extend(self.__get_url_info(tv_url, 'tv', nums))
-                time.sleep(2)
+                try:
+                    tv_list.extend(self.__get_url_info(tv_url, 'tv', nums))
+                    time.sleep(3)
+                except Exception as e:
+                    logger.warn(e)
             # 使用字典推导式和集合保持唯一性
             unique_dicts = {item['title']: item for item in tv_list}.values()
             # 转回列表形式
@@ -553,10 +560,14 @@ class MaoyanRank(_PluginBase):
         for addr in addr_list:
             try:
                 title = addr.get('title')
-                # 计算日期，获取年份信息
-                subtract = int(''.join(re.findall(r'\d', addr.get('releaseInfo'))))
-                target_time = current_time - datetime.timedelta(days=subtract)
-                year = target_time.year
+                try:
+                    # 计算日期，获取年份信息
+                    subtract = int(''.join(re.findall(r'\d', addr.get('releaseInfo'))))
+                    target_time = current_time - datetime.timedelta(days=subtract)
+                    year = target_time.year
+                except Exception as e:
+                    logger.warn(e)
+                    year = None
                 # 元数据
                 meta = MetaInfo(title)
                 meta.year = year
