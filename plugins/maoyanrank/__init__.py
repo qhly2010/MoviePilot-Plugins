@@ -366,7 +366,7 @@ class MaoyanRank(_PluginBase):
             tmdb_id = history.get("tmdbid")
             release_info = history.get("releaseInfo")
             platform = history.get("platformDesc")
-            if mtype == MediaType.TV:
+            if mtype == MediaType.TV.value:
                 href = f"https://www.themoviedb.org/tv/{tmdb_id}"
             else:
                 href = f"https://www.themoviedb.org/movie/{tmdb_id}"
