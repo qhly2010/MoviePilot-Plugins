@@ -1,7 +1,7 @@
 import datetime
 import json
+import random
 import re
-import time
 from threading import Event
 from typing import Tuple, List, Dict, Any
 
@@ -9,13 +9,13 @@ import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from lxml import etree
+from playwright.sync_api import sync_playwright
 
 from app.chain.download import DownloadChain
 from app.chain.subscribe import SubscribeChain
 from app.core.config import settings
 from app.core.context import MediaInfo
 from app.core.metainfo import MetaInfo
-from app.helper.browser import PlaywrightHelper
 from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas import MediaType
@@ -40,7 +40,7 @@ class MaoyanRank(_PluginBase):
     # 插件描述
     plugin_desc = "监控猫眼数据，自动添加订阅。"
     # 插件图标
-    plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/maoyan.jpg"
+    plugin_icon = "maoyan.jpg"
     # 插件版本
     plugin_version = "0.7"
     # 插件作者
@@ -366,10 +366,10 @@ class MaoyanRank(_PluginBase):
             tmdb_id = history.get("tmdbid")
             release_info = history.get("releaseInfo")
             platform = history.get("platformDesc")
-            if mtype == MediaType.MOVIE:
-                href = f"https://www.themoviedb.org/movie/{tmdb_id}"
-            else:
+            if mtype == MediaType.TV:
                 href = f"https://www.themoviedb.org/tv/{tmdb_id}"
+            else:
+                href = f"https://www.themoviedb.org/movie/{tmdb_id}"
             contents.append(
                 {
                     'component': 'VCard',
@@ -509,21 +509,15 @@ class MaoyanRank(_PluginBase):
         nums = self._num
         #
         history: List[dict] = self.get_data('history') or []
+        #
+        movie_url = ''
+        tv_urls = []
         if 'movie' in self._type:
             movie_url = 'https://piaofang.maoyan.com/dashboard-ajax/movie'
-            movie_list = []
-            try:
-                movie_list = self.__get_url_info(movie_url, 'movie', nums)
-                time.sleep(3)
-            except Exception as e:
-                logger.warn(e)
-            self.set_sub(movie_list, history, MediaType.MOVIE)
-
         if 'web-heat' in self._type:
             # 获取当前日期时间格式化为字符串
             url_header = 'https://piaofang.maoyan.com/dashboard/webHeatData'
             format_date = current_time.strftime("%Y%m%d")
-            tv_urls = []
             if len(self._seriesType) == 3:
                 tv_urls = [
                     f'{url_header}?showDate={format_date}&platformType={self._platform}',
@@ -538,18 +532,14 @@ class MaoyanRank(_PluginBase):
                     tv_urls.append(
                         f'{url_header}?showDate={format_date}&seriesType={series}&platformType={self._platform}',
                     )
-            tv_list = []
-            for tv_url in tv_urls:
-                try:
-                    tv_list.extend(self.__get_url_info(tv_url, 'tv', nums))
-                    time.sleep(3)
-                except Exception as e:
-                    logger.warn(e)
-            # 使用字典推导式和集合保持唯一性
-            unique_dicts = {item['title']: item for item in tv_list}.values()
-            # 转回列表形式
-            tv_list = list(unique_dicts)
-            self.set_sub(tv_list, history, MediaType.TV)
+        tv_list = []
+        movie_list = []
+        try:
+            movies_list, tv_list = self.__get_url_info(movie_url, tv_urls, nums)
+        except Exception as e:
+            logger.warn(e)
+        self.set_sub(movie_list, history, MediaType.MOVIE)
+        self.set_sub(tv_list, history, MediaType.TV)
         # 保存历史记录
         self.save_data('history', history)
         logger.info(f"猫眼订阅刷新完成")
@@ -602,7 +592,7 @@ class MaoyanRank(_PluginBase):
                 history.append({
                     "title": title,
                     "releaseInfo": addr.get('releaseInfo'),
-                    "platformDesc": addr.get('platformDesc', ''),
+                    "platformDesc": addr.get('platformDesc', '未知'),
                     "type": mediainfo.type.value,
                     "year": mediainfo.year,
                     "poster": mediainfo.get_poster_image(),
@@ -614,47 +604,76 @@ class MaoyanRank(_PluginBase):
             except Exception as e:
                 logger.error(str(e))
 
-    @staticmethod
-    def __get_url_info(url, types=None, num=10) -> List[dict]:
+    def __get_url_info(self, movie_url, tv_urls, num=10):
         """
         根据url获取
         """
-        if types == 'movie':
-            movies_list = []
+        movies_list = []
+        tv_list = []
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=False)
             try:
-                html_text = PlaywrightHelper().get_page_source(url)
-                body = etree.HTML(html_text)
-                res = json.loads(str(body.xpath('//body//text()')[0]))
-                data = res.get('movieList', {}).get('list', [])
+                context = browser.new_context(user_agent=self.get_random_user_agent())
+                page = context.new_page()
+                if movie_url:
+                    try:
+                        # 打开网页
+                        page.goto(movie_url)
+                        # 获取页面内容
+                        html_text = page.content()
+                        body = etree.HTML(html_text)
+                        res = json.loads(str(body.xpath('//body//text()')[0]))
+                        data = res.get('movieList', {}).get('list', [])
 
-                def info(movie):
-                    infos = movie.get('movieInfo')
-                    return {
-                        "title": infos.get('movieName'),
-                        "releaseInfo": infos.get('releaseInfo'),
-                    }
+                        def info(movie):
+                            infos = movie.get('movieInfo')
+                            return {
+                                "title": infos.get('movieName'),
+                                "releaseInfo": infos.get('releaseInfo'),
+                            }
 
-                movies_list = [info(i) for i in data][:num]
+                        movies_list = [info(i) for i in data][:num]
+                    except Exception as e:
+                        logger.error(f"获取网页源码失败: {str(e)}")
+                if tv_urls:
+                    for tv_url in tv_urls:
+                        try:
+                            # 打开网页
+                            page.goto(tv_url)
+                            # 获取页面内容
+                            html_text = page.content()
+                            body = etree.HTML(html_text)
+                            res = json.loads(str(body.xpath('//body//text()')[0]))
+                            data = res.get('dataList', {}).get('list', [])
+
+                            def tv_info(tv):
+                                infos = tv.get('seriesInfo')
+                                return {
+                                    "title": infos.get('name'),
+                                    "releaseInfo": infos.get('releaseInfo'),
+                                    "platformDesc": infos.get('platformDesc'),
+                                }
+
+                            tv_list.extend([tv_info(i) for i in data][:num])
+                        except Exception as e:
+                            logger.error(f"获取网页源码失败: {str(e)}")
+                    # 使用字典推导式和集合保持唯一性
+                    unique_dicts = {item['title']: item for item in tv_list}.values()
+                    # 转回列表形式
+                    tv_list = list(unique_dicts)
             except Exception as e:
-                logger.error(f"Error: 爬取数据失败{e}")
-            return movies_list
-        else:
-            tv_list = []
-            try:
-                html_text = PlaywrightHelper().get_page_source(url)
-                body = etree.HTML(html_text)
-                res = json.loads(str(body.xpath('//body//text()')[0]))
-                data = res.get('dataList', {}).get('list', [])
+                logger.error(f"获取网页源码失败: {str(e)}")
+            finally:
+                # 关闭页面
+                browser.close()
+        return movies_list, tv_list
 
-                def tv_info(tv):
-                    infos = tv.get('seriesInfo')
-                    return {
-                        "title": infos.get('name'),
-                        "releaseInfo": infos.get('releaseInfo'),
-                        "platformDesc": infos.get('platformDesc'),
-                    }
-
-                tv_list = [tv_info(i) for i in data][:num]
-            except Exception as e:
-                logger.error(f"Error: 爬取数据失败{e}")
-            return tv_list
+    @staticmethod
+    def get_random_user_agent():
+        user_agents = [
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        ]
+        return random.choice(user_agents)
