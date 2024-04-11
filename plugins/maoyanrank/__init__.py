@@ -42,7 +42,7 @@ class MaoyanRank(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/maoyan.jpg"
     # 插件版本
-    plugin_version = "0.7"
+    plugin_version = "0.8"
     # 插件作者
     plugin_author = "逗猫"
     # 作者主页
@@ -566,7 +566,7 @@ class MaoyanRank(_PluginBase):
                 if unique_flag in [h.get("unique") for h in history]:
                     continue
                 # 匹配媒体信息
-                mediainfo: MediaInfo = self.chain.recognize_media(meta=meta, mtype=mtype)
+                mediainfo: MediaInfo = self.chain.recognize_media(meta=meta, mtype=mtype, cache=False)
                 if not mediainfo:
                     logger.warn(f'未识别到媒体信息，标题：{title}，年份：{year}')
                     continue
