@@ -1,91 +1,79 @@
-### 一个利用wireshark抓包出来的pc客户端api制作的下载网易云音乐的音乐和Mv的一个小脚本。
-### 修改https://github.com/xzap/NeteasyMusic/blob/master/neteasymusic.py
+
+import re
 import time
 
-import requests
-import hashlib
-import base64
 
 from app.log import logger
+from NeteaseCloudMusic import NeteaseCloudMusicApi
+from app.plugins.syncmusiclist.utils import change_str, sub_str
 
 
 class CloudMusic(object):
     def __init__(self):
-        self.req = requests.Session()
-        self.headers = {"Referer": "http://music.163.com/",
-                        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.138 Safari/537.36",
-                        }
-        self.cookies = {"appver": "1.5.2",
-                        "os": "pc",
-                        "channel": "netease",
-                        "osver": "Microsoft-Windows-7-Professional-Service-Pack-1-build-7601-64bit",
-                        }
-        self.req.cookies.update(self.cookies)
-        self.req.headers.update(self.headers)
+        self.music_api = NeteaseCloudMusicApi()  # 初始化API
+        version_result = self.music_api.request("inner_version")
+        logger.info(f'当前使用NeteaseCloudMusicApi版本号：{version_result["NeteaseCloudMusicApi"]}\n'
+                    f'当前使用NeteaseCloudMusicApi_V8版本号：{version_result["NeteaseCloudMusicApi_V8"]}')
+
+    def login_status(self):
+        response = self.music_api.request("/login/status")
+        return response
+
+    def captcha_sent(self, _phone):
+        """验证码"""
+        response = self.music_api.request("/captcha/sent", {"phone": f"{_phone}"})
+        return response
+
+    def login_cellphone(self, _phone, _captcha):
+        """验证码登录"""
+        response = self.music_api.request("/login/cellphone", {"phone": f"{_phone}", "captcha": f"{_captcha}"})
+        return response
+
 
     def login(self, username, password, phone=False):
         """
         登陆到网易云音乐
+        调用登录接口后，会自动设置cookie，如果cookie失效，需要重新登录，登录过后api会在你的当前工作目录下创建cookie_storage文件保存你的cookie
+        在下次调用运行程序时，他会判断cookie是否过期，没有过期就自动读取cookie_storage文件中的cookie。
+
+        总的来说你不需要手动管理cookie，只需要调用登录接口，然后调用其他接口即可，cookie会自动设置，如果cookie过期，再次调用登录接口就好。
+        更好的办法是，在cookie还没有失效之前使用refresh_login接口刷新cookie，这样就不需要重新登录了（建议在你每次启动软件时都刷新，当然频繁重启调试的时候另算）
+
+        如果你想判断当前是否已经登录，if not netease_cloud_music_api.cookie 就可以了，或者调用/login/status接口
+
         """
-        action = 'http://music.163.com/api/login/'
-        phone_action = 'http://music.163.com/api/login/cellphone/'
-        password = password.encode('utf-8')
-        data = {
-            'username': username,
-            'password': hashlib.md5(password).hexdigest(),
-            'rememberLogin': 'true'
-        }
-        phone_data = {
-            'phone': username,
-            'password': hashlib.md5(password).hexdigest(),
-            'rememberLogin': 'true'
-        }
-        try:
+        # 登录
+        if not self.music_api.cookie:
             if phone is True:
-                r = self.req.post(phone_action, data=phone_data)
-                self.cookies = r.cookies
-                self.req.cookies.update(self.cookies)
-                return r.json()
+                response = self.music_api.request("/login/cellphone",
+                                                  {"phone": f"{username}", "password": f"{password}"})
             else:
-                r = self.req.post(action, data=data)
-                print(r.cookies)
-                self.cookies = r.cookies
-                self.req.cookies.update(self.cookies)
-                return r.json()
-        except Exception as e:
-            print(str(e))
-            return {'code': 408}
+                response = self.music_api.request("/login",
+                                                  {"email": f"{username}", "password": f"{password}"})
+            if response.get("code") == 200:
+                logger.info("登录成功")
+                if self.music_api.cookie:
+                    logger.info("cookie已缓存")
+            else:
+                logger.error("登录失败")
 
-    def encrypted_id(self, id):
-        """
-        为下载mp3转换id
-        """
-        byte1 = bytearray('3go8&$8*3*3h0k(2)2', "utf8")
-        byte2 = bytearray(str(id), "utf8")
-        byte1_len = len(byte1)
-        for i in range(len(byte2)):
-            byte2[i] = byte2[i] ^ byte1[i % byte1_len]
-        m = hashlib.md5()
-        m.update(byte2)
-        result = m.digest()
-        result = base64.encodebytes(result).decode()[:-1]
-        result = result.replace('/', '_')
-        result = result.replace('+', '-')
-        return result
+    def get_list_days(self):
+        res = self.music_api.request("/recommend/resource")
+        recommend = res.get('data', {}).get('recommend', [])
+        return recommend
 
-    def song(self, uid):
-        """
-        单曲信息
-        Full request URI: http://music.163.com/api/song/detail/?id=28377211&ids=%5B28377211%5D
-        GET  http://music.163.com/api/song/detail/  
-        必要参数：   
-            id：歌曲ID 
-            ids：不知道干什么用的，用[]括起来的歌曲ID
-        """
-        url = "http://music.163.com/api/song/detail/"
-        params = {"id": uid, "ids": "[%s]" % uid}
-        r = self.req.get(url, params=params)
-        return r.json()
+    def get_song_daily(self):
+        res = self.music_api.request("/recommend/songs")
+        dailySongs = res['data']['data']['dailySongs']
+        track_names = []
+        for i in dailySongs:
+            # 正则处理
+            name = sub_str(i.get('name'))
+            # 多歌手处理
+            ars = [change_str(ar.get('name')) for ar in i.get('ar')]
+            track_names.append([name, ars])
+        return track_names
+
 
     def playlist(self, uid):
         """
@@ -95,10 +83,8 @@ class CloudMusic(object):
         必要参数：
             id：歌单ID
         """
-        url = "http://music.163.com/api/playlist/detail"
-        params = {"id": uid}
-        r = self.req.get(url, params=params)
-        return r.json()
+        res = self.music_api.request(f"/playlist/track/all", {"id": f"{uid}"})
+        return res.get('data', {}).get('songs')
     
     def songofplaylist(self, uid):
         """
@@ -112,69 +98,27 @@ class CloudMusic(object):
         retry_times = 0
         while retry_times < max_retry_times:
             try:
-                playlist = self.playlist(uid)['result']
-                tracks = playlist['tracks']
+                tracks = self.playlist(uid)
                 break  # 如果成功执行，跳出循环
             except Exception as e:
                 logger.warn(f"第 {retry_times + 1} 次重试失败：获取歌单错误")
                 retry_times += 1
                 time.sleep(2)  # 添加延时
-        track_names = [(i.get('name').split(' (')[0].split('(')[0].split('（')[0], i.get('artists')[0].get('name'))
-                       for i in tracks]
+        track_names = []
+        for i in tracks:
+            # 正则处理
+            name = sub_str(i.get('name'))
+            # 多歌手处理
+            ars = [change_str(ar.get('name')) for ar in i.get('ar')]
+            track_names.append([name, ars])
         return track_names
-
-    def lyric(self, uid, os="pc", lv=-1, kv=-1):
-        """
-        歌词
-        Full request URI: http://music.163.com/api/song/lyric?os=pc&id=93920&lv=-1&kv=-1&tv=-1
-        GET http://music.163.com/api/song/lyric
-        必要参数：
-            id：歌曲ID
-            lv：值为-1，我猜测应该是判断是否搜索lyric格式
-            kv：值为-1，这个值貌似并不影响结果，意义不明
-            tv：值为-1，是否搜索tlyric格式
-        """
-
-        url = "http://music.163.com/api/song/lyric"
-        params = {"id": uid, "os": os, "kv": kv, "lv": lv}
-        r = self.req.get(url, params=params)
-        return r.json()['lrc']['lyric']
-
-    def user_playlist(self, uid, offset=0, limit=100):
-        """
-        用户歌单
-        http://music.163.com/api/user/playlist/?offset=0&limit=100&uid=uid
-        """
-        url = "http://music.163.com/api/user/playlist/"
-        params = {"uid": uid, "offset": offset, "limit": limit}
-        r = self.req.get(url, params=params)
-        return r.json()
-
-    def get_track(self, tracks, fname):
-        """
-        获取多轨列表中的歌曲信息
-        """
-        result = []
-        for track in tracks:
-            name = track['name'].strip().replace(" ", "_")
-            album = track['album']['name'].strip().replace(" ", "_")
-            uuid = track['id']
-            artists = track['artists']
-            singer = "_".join([artist['name'].strip().replace(" ", "_") for artist in artists]).replace(" ", "_")
-            try:
-                sid = track['hMusic']['dfsId']
-                ext = track['hMusic']['extension']
-            except:
-                sid = track['mMusic']['dfsId']
-                ext = track['mMusic']['extension']
-            filename = "%s-%s.%s" % (name, singer, ext)
-            link = 'http://m1.music.126.net/{}/{}.{}'.format(self.encrypted_id(sid), sid, ext)
-            result.append((uuid, fname, filename, link, True))
-        return result
 
 
 if __name__ == '__main__':
     cm = CloudMusic()
-    res = cm.songofplaylist("3136179094")
+    res_s = cm.get_song_daily()
+    print(res_s)
+    res = cm.songofplaylist("365436873")
     print(res)
+
 

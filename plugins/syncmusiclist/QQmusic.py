@@ -1,6 +1,8 @@
+import re
 import json
 import uuid
 
+from app.plugins.syncmusiclist.utils import sub_str, change_str
 from app.utils.http import RequestUtils
 
 
@@ -69,15 +71,13 @@ class QQMusicApi(object):
             lst = playlist.get('data', {}).get('songlist', [])
         else:
             lst = []
-        # list_clear = [{
-        #             "id": i.get('id'),
-        #             "mid": i.get('mid'),
-        #             "name": i.get('name'),
-        #             "singer": i.get('singer'),
-        #             "title": i.get('title'),
-        #         } for i in lst]
-        list_clear = [(i.get('name').split(' (')[0].split('(')[0].split('（')[0], i.get('singer')[0].get('name'))
-                      for i in lst]
+        list_clear = []
+        for i in lst:
+            # 正则处理
+            name = sub_str(i.get('name'))
+            # 多歌手处理
+            ars = [change_str(ar.get('name')) for ar in i.get('singer')]
+            list_clear.append([name, ars])
         return list_clear
 
 

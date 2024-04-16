@@ -25,7 +25,7 @@ class SyncMusicList(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png"
     # 插件版本
-    plugin_version = "4.7"
+    plugin_version = "5.7"
     # 插件作者
     plugin_author = "逗猫"
     # 作者主页
@@ -205,7 +205,7 @@ class SyncMusicList(_PluginBase):
                                         'props': {
                                             'model': 'cron',
                                             'label': '执行周期',
-                                            'placeholder': '5位cron表达式，留空自动'
+                                            'placeholder': '5位cron表达式，留空自动, 建议每天一次'
                                         }
                                     }
                                 ]
@@ -341,6 +341,7 @@ class SyncMusicList(_PluginBase):
                                             'variant': 'tonal',
                                             'title': '使用说明:',
                                             'text':
+                                                '0. 耗时很长，建议每天一次即可，短时间重复运行会卡死; \n'
                                                 '1. plex/emby服务器中存在音乐类型的库; \n'
                                                 '2. plex/emby的播放列表需要提前创建好并且里边至少有一首歌曲; \n'
                                                 '3. 如不存在会自动创建歌单, 如库中没符合的歌曲会创建失败; \n'
@@ -435,7 +436,7 @@ class SyncMusicList(_PluginBase):
                     wy_play_id, media_playlist, emby_users = data_list[0], data_list[1], data_list[2]
                     emby_users = emby_users.split(',')
                 else:
-                    logger.warn(f"QQ音乐歌单同步设置配置不规范,请认真检查修改")
+                    logger.warn(f"网易云歌单同步设置配置不规范,请认真检查修改")
                     return
                 logger.info(f"网易云歌单id: {wy_play_id}, 媒体库播放列表名称: {media_playlist}")
                 if wy_play_id and media_playlist:

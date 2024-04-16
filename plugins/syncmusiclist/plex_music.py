@@ -85,17 +85,29 @@ class PlexMusic(Plex):
     def search_music(self, name_singer, exact_match=True):
         """通过歌曲名在库中进行搜索"""
         name = name_singer[0]
-        singer = name_singer[1]
+        singers = name_singer[1]
         if len(self.music_libraries) == 1:
             search_res = self._plex.search(name, mediatype='track', sectionId=int(self.music_libraries[0].id))
         else:
             search_res = self._plex.search(name, mediatype='track')
+        add_items = []
         if len(search_res) > 1:
             if exact_match:
-                search_res = [i for i in search_res if singer in i.grandparentTitle][:1]
+                add_items = []
+                # 通过歌手过滤
+                for i in search_res:
+                    if i.grandparentTitle in singers:
+                        # add
+                        add_items.append(i)
+                    else:
+                        str_arts = i.originalTitle
+                        for singer in singers:
+                            if singer in str_arts:
+                                # add
+                                add_items.append(i)
             else:
-                search_res = search_res[:1]
-        return search_res
+                add_items = search_res[:1]
+        return add_items
 
 
 if __name__ == '__main__':
@@ -103,4 +115,5 @@ if __name__ == '__main__':
     ml = pm.get_user_name()
     pm.get_playlists()
     pm.get_tracks_by_playlist('经典华语')
-    res = pm.search_music('七里香')
+    res = pm.search_music(['燕归巢', ['许嵩']])
+    print(res)

@@ -161,7 +161,7 @@ class EmbyMusic(Emby):
         """通过歌曲名在库中进行搜索"""
         # /emby/Users/{}/Items?Recursive=true&SearchTerm={}&api_key={}
         name = name_singer[0]
-        singer = name_singer[1]
+        singers = name_singer[1]
         url = f'{self._host}emby/Users/{self.user}/Items?Recursive=true&SearchTerm={name}&api_key={self._apikey}'
         try:
             res = self.get_data(url)
@@ -169,10 +169,24 @@ class EmbyMusic(Emby):
             if count > 0:
                 items = res.json().get("Items")
                 if exact_match:
+                    add_items = []
                     # 通过歌手过滤
-                    items = [i for i in items if singer in i.get("Artists", [])]
-                ids_list = [i.get('Id') for i in items if i.get('Type') == 'Audio'][:1]
-                name_list = [i.get('Name') for i in items if i.get('Type') == 'Audio'][:1]
+                    for i in items:
+                        arts = i.get("Artists", [])
+                        if len(set(arts) & set(singers)) > 0:
+                            # add
+                            add_items.append(i)
+                        else:
+                            str_arts = ' '.join(arts)
+                            for singer in singers:
+                                if singer in str_arts:
+                                    # add
+                                    add_items.append(i)
+                else:
+                    add_items = items
+
+                ids_list = [i.get('Id') for i in add_items if i.get('Type') == 'Audio'][:1]
+                name_list = [i.get('Name') for i in add_items if i.get('Type') == 'Audio'][:1]
             else:
                 ids_list = []
                 name_list = []
@@ -200,11 +214,11 @@ class EmbyMusic(Emby):
 
 if __name__ == '__main__':
     em = EmbyMusic()
-    emby_user = 'plb'
+    emby_user = 'tzp'
     em.user = em.get_user(emby_user)
     em.get_music_library()
     media_playlist = "许嵩专版"
-    t_tracks = ['断桥残雪', '有何不可']
+    t_tracks = [['通天大道宽又阔', ['崔京浩', '三叶草演唱组']], ['微微', ['傅如乔']], ['相思', ['毛阿敏']]]
 
     tracks = em.mul_search_music(t_tracks)
     playlist_id, music_ids, music_names = em.get_tracks_by_playlist(media_playlist)
