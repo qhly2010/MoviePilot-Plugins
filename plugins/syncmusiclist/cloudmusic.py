@@ -4,7 +4,7 @@ import time
 
 
 from app.log import logger
-from NeteaseCloudMusic import NeteaseCloudMusicApi
+from netcloudmusic import NeteaseCloudMusicApi
 from app.plugins.syncmusiclist.utils import change_str, sub_str
 
 
