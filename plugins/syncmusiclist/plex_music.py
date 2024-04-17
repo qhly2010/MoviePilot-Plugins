@@ -1,7 +1,10 @@
+from urllib.parse import urlencode
+
 from app.log import logger
 from app.schemas import MediaServerLibrary
 from app.modules.plex import Plex
 from plexapi.myplex import MyPlexAccount
+from plexapi.library import Hub
 
 
 class PlexMusic(Plex):
@@ -82,14 +85,55 @@ class PlexMusic(Plex):
         playlist = self._plex.playlist(playlist_title)
         playlist.addItems(tracks)
 
+    def search(self, query, mediatype=None, limit=None, sectionId=None):
+        """ Returns a list of media items or filter categories from the resulting
+            `Hub Search <https://www.plex.tv/blog/seek-plex-shall-find-leveling-web-app/>`_
+            against all items in your Plex library. This searches genres, actors, directors,
+            playlists, as well as all the obvious media titles. It performs spell-checking
+            against your search terms (because KUROSAWA is hard to spell). It also provides
+            contextual search results. So for example, if you search for 'Pernice', it’ll
+            return 'Pernice Brothers' as the artist result, but we’ll also go ahead and
+            return your most-listened to albums and tracks from the artist. If you type
+            'Arnold' you’ll get a result for the actor, but also the most recently added
+            movies he’s in.
+
+            Parameters:
+                query (str): Query to use when searching your library.
+                mediatype (str, optional): Limit your search to the specified media type.
+                    actor, album, artist, autotag, collection, director, episode, game, genre,
+                    movie, photo, photoalbum, place, playlist, shared, show, tag, track
+                limit (int, optional): Limit to the specified number of results per Hub.
+                sectionId (int, optional): The section ID (key) of the library to search within.
+        """
+        results = []
+        params = {
+            'query': query,
+            'X-Plex-Token': self._token,
+            'includeCollections': 1,
+            'includeExternalMedia': 1}
+        if limit:
+            params['limit'] = limit
+        if sectionId:
+            params['sectionId'] = sectionId
+
+
+        key = f'/hubs/search?{urlencode(params)}'
+        for hub in self._plex.fetchItems(key, Hub):
+            if mediatype:
+                if hub.type == mediatype:
+                    return hub.items
+            else:
+                results += hub.items
+        return results
+
     def search_music(self, name_singer, exact_match=True):
         """通过歌曲名在库中进行搜索"""
         name = name_singer[0]
         singers = name_singer[1]
         if len(self.music_libraries) == 1:
-            search_res = self._plex.search(name, mediatype='track', sectionId=int(self.music_libraries[0].id))
+            search_res = self.search(name, mediatype='track', limit=20, sectionId=int(self.music_libraries[0].id))
         else:
-            search_res = self._plex.search(name, mediatype='track')
+            search_res = self.search(name, mediatype='track', limit=20)
         add_items = []
         if len(search_res) > 1:
             if exact_match:
