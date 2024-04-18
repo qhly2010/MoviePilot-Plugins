@@ -25,7 +25,7 @@ class SyncMusicList(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png"
     # 插件版本
-    plugin_version = "6.7"
+    plugin_version = "7.7"
     # 插件作者
     plugin_author = "逗猫"
     # 作者主页
@@ -50,9 +50,11 @@ class SyncMusicList(_PluginBase):
     # 精准匹配开关
     _exact_match = True
     # 网易云登录设置, 同步自己歌单需要登录，不是自己不需要登录
-    _wylogin_type = 'phone'
     _wylogin_user = ''
     _wylogin_password = ''
+    #
+    _wy_daily_list = False
+    _wy_daily_song = False
 
     # 同步列表
     _wymusic_paths = ""
@@ -61,6 +63,15 @@ class SyncMusicList(_PluginBase):
     _event = Event()
 
     def init_plugin(self, config: dict = None):
+        # docker用默认路径
+        _path = self.get_data_path()
+        self.cm = CloudMusic(_path)
+        self._wylogin_capt = False
+        self._wylogin_pass = False
+        # 获取用户名信息
+        self._username = self.cm.login_status()
+
+
         # 读取配置
         if config:
             self._enabled = config.get("enabled")
@@ -72,6 +83,24 @@ class SyncMusicList(_PluginBase):
             self._wylogin_password = config.get("wylogin_password") or ""
             self._wymusic_paths = config.get("wymusic_paths") or ""
             self._qqmusic_paths = config.get("qqmusic_paths") or ""
+            self._wy_daily_list = config.get("wy_daily_list") or False
+            self._wy_daily_song = config.get("wy_daily_song") or False
+
+
+        if self._username:
+            self._wylogin_status = False
+            self._wyy_text = f"当前网抑云账号{self._username}登录成功，可以使用用户相关功能"
+        else:
+            if self._wylogin_user and self._wylogin_password:
+                self.cm.login(self._wylogin_user, self._wylogin_password)
+                self._username = self.cm.login_status()
+                if self._username:
+                    self._wylogin_status = False
+                    self._wyy_text = f"当前网抑云账号{self._username}登录成功，可以使用用户相关功能"
+                else:
+                    self._wylogin_status = True
+                    self._wyy_text = f"当前未登录网抑云账号,部分功能受限,请点击下方登录"
+
 
         # 停止现有任务
         self.stop_service()
@@ -89,9 +118,9 @@ class SyncMusicList(_PluginBase):
                     logger.error(f"歌单同步服务启动失败，原因：{str(e)}")
                     self.systemmessage.put(f"歌单同步服务启动失败，原因：{str(e)}")
             else:
-                logger.info(f"歌单同步服务启动，周期：每2天")
+                logger.info(f"歌单同步服务启动，周期：每天七点执行")
                 self._scheduler.add_job(func=self.__run_sync_paylist,
-                                        trigger=CronTrigger.from_crontab("0 0 */2 * *"),
+                                        trigger=CronTrigger.from_crontab("0 7 * * *"),
                                         name="歌单同步")
             if self._onlyonce:
                 logger.info(f"歌单同步服务，立即运行一次")
@@ -109,7 +138,9 @@ class SyncMusicList(_PluginBase):
                     "wylogin_user": self._wylogin_user,
                     "wylogin_password": self._wylogin_password,
                     "wymusic_paths": self._wymusic_paths,
-                    "qqmusic_paths": self._qqmusic_paths
+                    "qqmusic_paths": self._qqmusic_paths,
+                    "wy_daily_list": self._wy_daily_list,
+                    "wy_daily_song": self._wy_daily_song,
                 })
             if self._scheduler.get_jobs():
                 # 启动服务
@@ -127,6 +158,14 @@ class SyncMusicList(_PluginBase):
         pass
 
     def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
+        self._username = self.cm.login_status()
+        if self._username:
+            self._wylogin_status = False
+            self._wyy_text = f"当前网抑云账号{self._username}登录成功，可以使用用户相关功能"
+        else:
+            self._wylogin_status = True
+            self._wyy_text = f"当前未登录网抑云账号,部分功能受限,请选择对应方式登录"
+        self._login_status = not self._wylogin_status
         return [
             {
                 'component': 'VForm',
@@ -264,15 +303,219 @@ class SyncMusicList(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 4
                                 },
                                 'content': [
                                     {
-                                        'component': 'VTextField',
+                                        'component': 'VAlert',
                                         'props': {
-                                            'model': 'wylogin_user',
-                                            'label': '网易云手机号',
-                                            'placeholder': '',
+                                            'type': 'info',
+                                            'variant': 'tonal',
+                                            'title': '账号状态',
+                                            'text': self._wyy_text
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        "props": {
+                            "model": "wylogin_status",
+                        },
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VCheckboxBtn',
+                                        'props': {
+                                            'model': 'wylogin_pass',
+                                            'label': '使用密码登录(适用邮箱或者手机号)'
+                                        }
+                                    }
+                                ]
+                            },
+                            # {
+                            #     'component': 'VCol',
+                            #     'props': {
+                            #         'cols': 12,
+                            #         'md': 6
+                            #     },
+                            #     'content': [
+                            #         {
+                            #             'component': 'VCheckboxBtn',
+                            #             'props': {
+                            #                 'model': 'wylogin_capt',
+                            #                 'label': '使用验证码登录(适用手机号)'
+                            #             }
+                            #         }
+                            #     ]
+                            # }
+                        ]
+                    },
+                    {
+                        "component": "VDialog",
+                        "props": {
+                            "model": "wylogin_capt",
+                            "overlay-class": "v-dialog--scrollable",
+                            "content-class": "v-card v-card--density-default v-card--variant-elevated rounded-t",
+                            'cols': 30,
+                            'md': 12
+                        },
+                        "content": [
+                            {
+                                'component': 'VRow',
+                                'content': [
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VTextField',
+                                                'props': {
+                                                    'model': 'wylogin_user',
+                                                    'label': '手机号',
+                                                    'placeholder': '',
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VSwitch',
+                                                'props': {
+                                                    'model': 'capt_swich',
+                                                    'label': '获取验证码',
+                                                }
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                            {
+                                'component': 'VRow',
+                                'content': [
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VTextField',
+                                                'props': {
+                                                    'model': 'wylogin_password',
+                                                    'label': '验证码',
+                                                    'placeholder': '',
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VSwitch',
+                                                'props': {
+                                                    'model': 'login_swich',
+                                                    'label': '登录',
+                                                }
+                                            }
+                                        ]
+                                    },
+                                ]
+                            },
+                        ]
+                    },
+                    {
+                        "component": "VDialog",
+                        "props": {
+                            "model": "wylogin_pass",
+                            "overlay-class": "v-dialog--scrollable",
+                            "content-class": "v-card v-card--density-default v-card--variant-elevated rounded-t",
+                            'cols': 30,
+                            'md': 12
+                        },
+                        "content": [
+                            {
+                                'component': 'VRow',
+                                'content': [
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VTextField',
+                                                'props': {
+                                                    'model': 'wylogin_user',
+                                                    'label': '手机号/邮箱',
+                                                    'placeholder': '',
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        'component': 'VCol',
+                                        'props': {
+                                            'cols': 12,
+                                            'md': 4
+                                        },
+                                        'content': [
+                                            {
+                                                'component': 'VTextField',
+                                                'props': {
+                                                    'model': 'wylogin_password',
+                                                    'label': '密码',
+                                                    'placeholder': '',
+                                                    'type': 'password',
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                        ]
+                    },
+                    {
+                        'component': 'VRow',
+                        "props": {
+                            "model": "login_status",
+                        },
+                        'content': [
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'wy_daily_song',
+                                            'label': '每日推荐歌曲',
                                         }
                                     }
                                 ]
@@ -281,15 +524,14 @@ class SyncMusicList(_PluginBase):
                                 'component': 'VCol',
                                 'props': {
                                     'cols': 12,
-                                    'md': 4
+                                    'md': 6
                                 },
                                 'content': [
                                     {
-                                        'component': 'VTextField',
+                                        'component': 'VSwitch',
                                         'props': {
-                                            'model': 'wylogin_password',
-                                            'label': '网易云密码',
-                                            'placeholder': '',
+                                            'model': 'wy_daily_list',
+                                            'label': '每日推荐歌单',
                                         }
                                     }
                                 ]
@@ -325,6 +567,7 @@ class SyncMusicList(_PluginBase):
                             }
                         ]
                     },
+
                     {
                         'component': 'VRow',
                         'content': [
@@ -342,14 +585,14 @@ class SyncMusicList(_PluginBase):
                                             'title': '使用说明:',
                                             'text':
                                                 '0. 耗时很长，建议每天一次即可，短时间重复运行会卡死; \n'
+                                                '00. 网抑云登录后支持每日推荐歌单的递增; \n'
                                                 '1. plex/emby服务器中存在音乐类型的库; \n'
                                                 '2. plex/emby的播放列表需要提前创建好并且里边至少有一首歌曲; \n'
                                                 '3. 如不存在会自动创建歌单, 如库中没符合的歌曲会创建失败; \n'
                                                 '4. 歌单同步只会搜索已存在歌曲进行添加,不会自动下载; \n'
                                                 '5. 歌曲匹配是模糊匹配只匹配曲名不匹配歌手; \n'
-                                                '6. 网易云歌单同步最好登录自己的账号，失败率会小很多; \n'
+                                                '6. 精准匹配打开后先进行歌曲搜索然后通过歌手来进行过滤; \n'
                                                 '7. emby支持多用户设置，plex自带分享无需创建; \n'
-                                                '8. 精准匹配打开后先进行歌曲搜索然后通过歌手来进行过滤 \n'
                                         }
                                     }
                                 ]
@@ -377,7 +620,7 @@ class SyncMusicList(_PluginBase):
         plex_on = False
         emby_on = False
         emby_users = []
-        if not self._wymusic_paths and not self._qqmusic_paths:
+        if not self._wymusic_paths and not self._qqmusic_paths  and not self._username:
             logger.info("同步配置为空,不进行处理。告退......")
             return
         if not self._media_server:
@@ -424,9 +667,6 @@ class SyncMusicList(_PluginBase):
                 else:
                     logger.warn(f"QQ音乐歌单同步设置配置不规范,请认真检查修改")
         if self._wymusic_paths:
-            cm = CloudMusic()
-            if self._wylogin_user and self._wylogin_password:
-                cm.login(self._wylogin_user, self._wylogin_password, phone=True)
             wymusic_paths = self._wymusic_paths.split("\n")
             for path in wymusic_paths:
                 data_list = path.split(':')
@@ -439,21 +679,50 @@ class SyncMusicList(_PluginBase):
                     logger.warn(f"网易云歌单同步设置配置不规范,请认真检查修改")
                     return
                 logger.info(f"网易云歌单id: {wy_play_id}, 媒体库播放列表名称: {media_playlist}")
-                if wy_play_id and media_playlist:
-                    wy_tracks = cm.songofplaylist(wy_play_id)
-                    if not wy_tracks:
-                        logger.error("网易云歌单获取失败，请登录账号重试")
-                    else:
-                        logger.info(f"网易云歌单 {wy_play_id} 获取歌曲[{len(wy_tracks)}]首,列表为: {wy_tracks}")
-                        if plex_on:
-                            self.__t_plex(pm, wy_tracks, media_playlist)
-                        if emby_on:
-                            logger.info(
-                                f"网易云歌单: {wy_tracks}, 为Emby用户{emby_users}更新媒体库播放列表名称: {media_playlist}")
-                            self.__t_emby(em, wy_tracks, media_playlist, emby_users)
-                else:
-                    logger.warn(f"网易云音乐歌单同步设置配置不规范,请认真检查修改")
+                self.cm_emby_plex(wy_play_id, media_playlist, emby_users, plex_on, emby_on)
+        if self._username:
+            # 每日推荐歌单
+            if self._wy_daily_list:
+                try:
+                    datas = self.cm.get_list_days()
+                    for data in datas:
+                        wy_play_id, media_playlist = data[0], data[1]
+                        self.cm_emby_plex(wy_play_id, media_playlist, emby_users, plex_on, emby_on)
+                except Exception as e:
+                    logger.error(e)
+                    logger.error(f"每日推荐歌单获取失败")
+            # 每日歌曲推荐
+            if self._wy_daily_song:
+                try:
+                    wy_tracks =  self.cm.get_song_daily()
+                    playlist = "每日歌曲推荐"
+                    logger.info(f"网易云歌单 {playlist} 获取歌曲[{len(wy_tracks)}]首,列表为: {wy_tracks}")
+                    if plex_on:
+                        self.__t_plex(pm, wy_tracks, playlist)
+                    if emby_on:
+                        logger.info(
+                            f"网易云歌单: {wy_tracks}, 为Emby用户{emby_users}更新媒体库播放列表名称: {playlist}")
+                        self.__t_emby(em, wy_tracks, playlist, emby_users)
+                except Exception as e:
+                    logger.error(e)
+                    logger.error(f"每日推荐更新失败")
         return
+
+    def cm_emby_plex(self, wy_play_id, media_playlist, emby_users, plex_on, emby_on):
+        if wy_play_id and media_playlist:
+            wy_tracks = self.cm.songofplaylist(wy_play_id)
+            if not wy_tracks:
+                logger.error("网易云歌单获取失败，请登录账号重试")
+            else:
+                logger.info(f"网易云歌单 {wy_play_id} 获取歌曲[{len(wy_tracks)}]首,列表为: {wy_tracks}")
+                if plex_on:
+                    self.__t_plex(pm, wy_tracks, media_playlist)
+                if emby_on:
+                    logger.info(
+                        f"网易云歌单: {wy_tracks}, 为Emby用户{emby_users}更新媒体库播放列表名称: {media_playlist}")
+                    self.__t_emby(em, wy_tracks, media_playlist, emby_users)
+        else:
+            logger.warn(f"网易云音乐歌单同步设置配置不规范,请认真检查修改")
 
     def __t_emby(self, em, t_tracks, media_playlist, emby_users=None):
         if emby_users is None:
