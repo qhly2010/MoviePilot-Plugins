@@ -19,13 +19,18 @@ class NeteaseCloudMusicApi:
     __cookie = None
     __ip = None
 
-    cache = Cache('cache', timeout=120)  # 设置缓存目录和过期时间
 
     # cache = TTLCache(maxsize=100, ttl=120)  # 设置缓存大小为100，缓存项的生存时间为120秒
 
-    def __init__(self, debug=False, cache=False):
+    def __init__(self, debug=False, cach=False, path=None):
+        self.path = path
+        if path:
+            self.cache = Cache(str(self.path), timeout=120)  # 设置缓存目录和过期时间
+        else:
+            self.cache = Cache('cache', timeout=120)  # 设置缓存目录和过期时间
+
         self.DEBUG = debug  # 是否开启调试模式
-        self.CACHE = cache  # 是否开启缓存
+        self.CACHE = cach  # 是否开启缓存
 
         self.special_api = {"/playlist/track/all": self.playlist_track_all,
                             "/login/cellphone": self.login_cellphone,
@@ -128,8 +133,10 @@ class NeteaseCloudMusicApi:
     @property
     def cookie(self):
         if self.__cookie is None:
-            if os.path.isfile("cookie_storage"):
-                with open("cookie_storage", "r", encoding='utf-8') as f:
+
+            cookie_path = str(self.path / "cookie_storage") if self.path else "cookie_storage"
+            if os.path.isfile(cookie_path):
+                with open(cookie_path, "r", encoding='utf-8') as f:
                     content = f.read()
                 try:
                     cookie_storage = json.loads(content)
@@ -169,7 +176,8 @@ class NeteaseCloudMusicApi:
                 raise Exception(f"cookie is illegal, missing key: {key}.")
 
         self.__cookie = value
-        with open("cookie_storage", "w+", encoding='utf-8') as f:
+        cookie_path = str(self.path / "cookie_storage") if self.path else "cookie_storage"
+        with open(cookie_path, "w+", encoding='utf-8') as f:
             f.write(json.dumps({"cookie": value, "create_time_stamp": time.time()}, indent=2, ensure_ascii=False))
 
     @property

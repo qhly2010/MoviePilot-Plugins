@@ -9,15 +9,29 @@ from app.plugins.syncmusiclist.utils import change_str, sub_str
 
 
 class CloudMusic(object):
-    def __init__(self):
-        self.music_api = NeteaseCloudMusicApi()  # 初始化API
+    def __init__(self, path=None):
+        self.music_api = NeteaseCloudMusicApi(path=path)  # 初始化API
         version_result = self.music_api.request("inner_version")
         logger.info(f'当前使用NeteaseCloudMusicApi版本号：{version_result["NeteaseCloudMusicApi"]}\n'
                     f'当前使用NeteaseCloudMusicApi_V8版本号：{version_result["NeteaseCloudMusicApi_V8"]}')
 
     def login_status(self):
-        response = self.music_api.request("/login/status")
-        return response
+        """账户登录状态"""
+        try:
+            if not self.music_api.cookie:
+                return None
+            response = self.music_api.request("/login/status")
+            if response['data']['data']["code"] == 200:
+                try:
+                    nickname = response["data"]["data"]["profile"]["nickname"]
+                    logger.info(f'当前登录账号：{nickname}')
+                except:
+                    nickname = None
+                return nickname
+            else:
+                return None
+        except:
+            return None
 
     def captcha_sent(self, _phone):
         """验证码"""
@@ -30,7 +44,7 @@ class CloudMusic(object):
         return response
 
 
-    def login(self, username, password, phone=False):
+    def login(self, username, password):
         """
         登陆到网易云音乐
         调用登录接口后，会自动设置cookie，如果cookie失效，需要重新登录，登录过后api会在你的当前工作目录下创建cookie_storage文件保存你的cookie
@@ -44,7 +58,7 @@ class CloudMusic(object):
         """
         # 登录
         if not self.music_api.cookie:
-            if phone is True:
+            if username.isdigit():
                 response = self.music_api.request("/login/cellphone",
                                                   {"phone": f"{username}", "password": f"{password}"})
             else:
@@ -57,12 +71,20 @@ class CloudMusic(object):
             else:
                 logger.error("登录失败")
 
-    def get_list_days(self):
+    def signin(self):
+        """网易云签到"""
+        res = self.music_api.request("/daily_signin")
+        return res
+
+    def get_list_days(self, nums=5):
+        """每日推荐歌单"""
         res = self.music_api.request("/recommend/resource")
         recommend = res.get('data', {}).get('recommend', [])
-        return recommend
+        res = [[i.get("id"), i.get("name")] for i in recommend[:nums] if i.get("id")]
+        return res
 
     def get_song_daily(self):
+        """每日推荐歌曲"""
         res = self.music_api.request("/recommend/songs")
         dailySongs = res['data']['data']['dailySongs']
         track_names = []
@@ -116,8 +138,12 @@ class CloudMusic(object):
 
 if __name__ == '__main__':
     cm = CloudMusic()
+    cm.signin()
     res_s = cm.get_song_daily()
+
     print(res_s)
+    res_day = cm.get_list_days()
+
     res = cm.songofplaylist("365436873")
     print(res)
 
