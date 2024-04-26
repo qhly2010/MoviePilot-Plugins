@@ -1,13 +1,14 @@
 {
     "SyncMusicList": {
-        "name": "同步QQ/网易云歌单",
+        "name": "歌单同步",
         "description": "同步QQ/网易云歌单到plex&emby。",
-        "version": "7.0",
+        "version": "7.1",
         "icon": "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png",
         "color": "#7eabf3",
         "author": "逗猫",
         "level": 2,
         "history": {
+            "v7.1": "1. UI优化 2. 歌单去重 3. plex默认获取最高码率的歌",
             "v7.0": "1. cookie缓存 2. 支持网抑云获取每日推荐",
             "v6.7": "1. 优化plex搜索 2. 修复插件安装错误",
             "v5.7": "1. 重写网易云歌单获取; 2. 优化标题后处理; 3. 优化歌手精准匹配 4. 支持多歌手单个匹配入库 5. 修复bug",

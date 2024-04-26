@@ -175,13 +175,17 @@ class EmbyMusic(Emby):
                         arts = i.get("Artists", [])
                         if len(set(arts) & set(singers)) > 0:
                             # add
-                            add_items.append(i)
+                            add_items = [i]
+                            break
                         else:
                             str_arts = ' '.join(arts)
                             for singer in singers:
                                 if singer in str_arts:
                                     # add
-                                    add_items.append(i)
+                                    add_items = [i]
+                                    break
+                            if add_items:
+                                break
                 else:
                     add_items = items
 

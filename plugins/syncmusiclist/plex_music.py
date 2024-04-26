@@ -138,17 +138,22 @@ class PlexMusic(Plex):
         if len(search_res) > 1:
             if exact_match:
                 add_items = []
+                bitrate = 0
                 # 通过歌手过滤
                 for i in search_res:
-                    if i.grandparentTitle in singers:
+                    if i.grandparentTitle or i.grandparentTitle in singers:
                         # add
-                        add_items.append(i)
+                        if i.media[0].bitrate or 1 > bitrate:
+                            bitrate = i.media[0].bitrate or 1
+                            add_items = [i]
                     else:
-                        str_arts = i.originalTitle
+                        str_arts = i.originalTitle or i.grandparentTitle
                         for singer in singers:
                             if singer in str_arts:
                                 # add
-                                add_items.append(i)
+                                if i.media[0].bitrate > bitrate:
+                                    bitrate = i.media[0].bitrate or 1
+                                    add_items = [i]
             else:
                 add_items = search_res[:1]
         return add_items
@@ -159,5 +164,5 @@ if __name__ == '__main__':
     ml = pm.get_user_name()
     pm.get_playlists()
     pm.get_tracks_by_playlist('经典华语')
-    res = pm.search_music(['燕归巢', ['许嵩']])
+    res = pm.search_music(['雨蝶', ['刘君']])
     print(res)

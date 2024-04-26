@@ -19,13 +19,13 @@ from app.plugins.syncmusiclist.plex_music import PlexMusic
 
 class SyncMusicList(_PluginBase):
     # 插件名称
-    plugin_name = "同步QQ/网易云歌单"
+    plugin_name = "歌单同步工具"
     # 插件描述
-    plugin_desc = "同步QQ/网易云歌单到plex&emby。"
+    plugin_desc = "同步QQ&网易云歌单到plex&emby。"
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/baozaodetudou/MoviePilot-Plugins/main/icons/music.png"
     # 插件版本
-    plugin_version = "7.0"
+    plugin_version = "7.1"
     # 插件作者
     plugin_author = "逗猫"
     # 作者主页
@@ -450,52 +450,99 @@ class SyncMusicList(_PluginBase):
                         "component": "VDialog",
                         "props": {
                             "model": "wylogin_pass",
+                            "max-width": "65rem",
                             "overlay-class": "v-dialog--scrollable",
                             "content-class": "v-card v-card--density-default v-card--variant-elevated rounded-t",
-                            'cols': 30,
-                            'md': 12
                         },
                         "content": [
                             {
-                                'component': 'VRow',
+                                "component": "VCard",
+                                "props": {
+                                    "title": "网抑云配置"
+                                },
                                 'content': [
                                     {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
+                                        "component": "VDialogCloseBtn",
+                                        "props": {
+                                            "model": "wylogin_pass"
+                                        }
+                                    },
+                                    {
+                                        "component": "VCardText",
+                                        "props": {},
                                         'content': [
                                             {
-                                                'component': 'VTextField',
-                                                'props': {
-                                                    'model': 'wylogin_user',
-                                                    'label': '手机号/邮箱',
-                                                    'placeholder': '',
-                                                }
+                                                'component': 'VRow',
+                                                'content': [
+                                                    {
+                                                        'component': 'VCol',
+                                                        'props': {
+                                                            'cols': 12,
+                                                            'md': 4
+                                                        },
+                                                        'content': [
+                                                            {
+                                                                'component': 'VTextField',
+                                                                'props': {
+                                                                    'model': 'wylogin_user',
+                                                                    'label': '手机号/邮箱',
+                                                                    'placeholder': '',
+                                                                }
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        'component': 'VCol',
+                                                        'props': {
+                                                            'cols': 12,
+                                                            'md': 4
+                                                        },
+                                                        'content': [
+                                                            {
+                                                                'component': 'VTextField',
+                                                                'props': {
+                                                                    'model': 'wylogin_password',
+                                                                    'label': '密码',
+                                                                    'placeholder': '',
+                                                                    'type': 'password',
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                'component': 'VRow',
+                                                'content': [
+                                                    {
+                                                        'component': 'VCol',
+                                                        'props': {
+                                                            'cols': 12,
+                                                        },
+                                                        'content': [
+                                                            {
+                                                                'component': 'VAlert',
+                                                                'props': {
+                                                                    'type': 'info',
+                                                                    'variant': 'tonal'
+                                                                },
+                                                                'content': [
+                                                                    {
+                                                                        'component': 'span',
+                                                                        'text': '注意：输入信息后关闭窗口点击保存生效'
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
                                             }
                                         ]
                                     },
-                                    {
-                                        'component': 'VCol',
-                                        'props': {
-                                            'cols': 12,
-                                            'md': 4
-                                        },
-                                        'content': [
-                                            {
-                                                'component': 'VTextField',
-                                                'props': {
-                                                    'model': 'wylogin_password',
-                                                    'label': '密码',
-                                                    'placeholder': '',
-                                                    'type': 'password',
-                                                }
-                                            }
-                                        ]
-                                    }
+
                                 ]
                             },
+
                         ]
                     },
                     {
